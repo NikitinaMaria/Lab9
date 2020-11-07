@@ -10,7 +10,7 @@ screen_size_x = 800
 screen_size_y = 600
 FPS = 50
 
-# Colors and list of the colors
+# Colors
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
@@ -20,6 +20,8 @@ CYAN = (0, 255, 255)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 LIL = (190, 0, 255)
+DARK_GREEN = (0, 128, 0)
+GREY = (128, 128, 128)
 
 # The main screen
 screen = pygame.display.set_mode((screen_size_x, screen_size_y))
@@ -42,11 +44,11 @@ class Targets:
 
     def new_target(self):
         """
-        Initializing a new goal
+        Initializing a new target
         """
         self.target_x = rnd(600, 780)
         self.target_y = rnd(300, 550)
-        self.target_r = rnd(10, 50)
+        self.target_r = rnd(10, 35)
         self.target_speed_x = rnd(-5, 5)
         self.target_speed_y = rnd(-5, 5)
         self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
@@ -143,6 +145,7 @@ class Bomb_ball(Balls):
         self.speed_x *= 0.5
         self.speed_y *= 0.5
 
+
 class Mini_ball(Balls):
     def __init__(self, angle, power, start_x, start_y, parent):
         """
@@ -165,10 +168,11 @@ class Gun:
         self.gun_power = gun_power
         self.gun_on = gun_on
         self.gun_angle = gun_angle
-        self.color = BLACK
+        self.color = GREY
         self.gun_x = gun_x
         self.gun_y = gun_y
-        self.id = line(screen, self.color, [self.gun_x, self.gun_y], [self.gun_x + 20, self.gun_y + 20], 7)
+        self.gun_move = False
+        self.direction = 'stop'
 
     def fire_start(self):
         """
@@ -202,10 +206,56 @@ class Gun:
         if self.gun_on:
             self.color = RED
         else:
-            self.color = BLACK
-        self.id = line(screen, self.color, [self.gun_x, self.gun_y],
-                       [self.gun_x + max(self.gun_power, 20) * math.cos(self.gun_angle),
-                        self.gun_y + max(self.gun_power, 20) * math.sin(self.gun_angle)], 7)
+            self.color = GREY
+        if self.direction == 'left':
+            rect(screen, BLACK, (self.gun_x - 13, self.gun_y - 15, 40, 30))
+            rect(screen, GREY, (self.gun_x - 16, self.gun_y - 20, 46, 5))
+            rect(screen, GREY, (self.gun_x - 16, self.gun_y + 15, 46, 5))
+        elif self.direction == 'up':
+            rect(screen, BLACK, (self.gun_x - 15, self.gun_y - 13, 30, 40))
+            rect(screen, GREY, (self.gun_x - 20, self.gun_y - 16, 5, 46))
+            rect(screen, GREY, (self.gun_x + 15, self.gun_y - 16, 5, 46))
+        elif self.direction == 'down':
+            rect(screen, BLACK, (self.gun_x - 15, self.gun_y - 27, 30, 40))
+            rect(screen, GREY, (self.gun_x - 20, self.gun_y - 30, 5, 46))
+            rect(screen, GREY, (self.gun_x + 15, self.gun_y - 30, 5, 46))
+        else:
+            rect(screen, BLACK, (self.gun_x - 27, self.gun_y - 15, 40, 30))
+            rect(screen, GREY, (self.gun_x - 30, self.gun_y - 20, 46, 5))
+            rect(screen, GREY, (self.gun_x - 30, self.gun_y + 15, 46, 5))
+        circle(screen, DARK_GREEN, (self.gun_x, self.gun_y), 10)
+        line(screen, self.color, [self.gun_x, self.gun_y],
+             [self.gun_x + max(self.gun_power, 20) * math.cos(self.gun_angle),
+              self.gun_y + max(self.gun_power, 20) * math.sin(self.gun_angle)], 7)
+
+    def move_start(self, direction):
+        """
+        The gun starts moving
+        :param direction: Direction of movement
+        """
+        self.direction = direction
+        self.gun_move = True
+
+    def move_end(self):
+        """
+        The cannon finishes moving
+        """
+        self.direction = 'stop'
+        self.gun_move = False
+
+    def move(self):
+        '''
+        The function sets the new coordinates of the tank
+        '''
+        if self.gun_move == True:
+            if (self.direction == 'right') and (self.gun_x <= screen_size_x - 20):
+                self.gun_x += 5
+            if (self.direction == 'left') and (self.gun_x >= 35):
+                self.gun_x -= 5
+            if (self.direction == 'up') and (self.gun_y >= 25):
+                self.gun_y -= 5
+            if (self.direction == 'down') and (self.gun_y <= screen_size_y - 25):
+                self.gun_y += 5
 
     def power_up(self):
         """
@@ -216,7 +266,7 @@ class Gun:
                 self.gun_power += 1
             self.color = RED
         else:
-            self.color = BLACK
+            self.color = GREY
 
 
 class Target_1(Targets):
@@ -251,6 +301,7 @@ class Target_1(Targets):
             self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
             circle(screen, BLACK, (self.target_x, self.target_y), self.target_r, 1)
 
+
 class Target_2(Targets):
     def __init__(self, parent):
         """
@@ -258,7 +309,7 @@ class Target_2(Targets):
         """
         super().__init__(LIL)
         self.parent = parent
-        self.target_r //= 2
+        self.target_r //= 3
         self.show_time = 60
         self.hide_time = 50
         self.invisible = False
@@ -301,12 +352,72 @@ class Target_2(Targets):
                     self.hide_time = 50
 
 
+class Bomb:
+    def __init__(self, target_x, target_y, gun_x, gun_y, parent):
+        self.parent = parent
+        self.angle = 0
+        self.bomb_x = target_x
+        self.bomb_y = target_y
+        self.bomb_r = 15
+        if gun_x != target_x:
+            if gun_x > target_x:
+                self.angle = math.atan((gun_y - target_y) / (gun_x - target_x))
+            else:
+                self.angle = math.pi + math.atan((gun_y - target_y) / (gun_x - target_x))
+        self.speed_x = 5 * math.cos(self.angle)
+        self.speed_y = - 5 * math.sin(self.angle)
+        self.live = 100
+        self.bomb_surf = pygame.image.load('star.png')
+        self.scale = pygame.transform.scale(self.bomb_surf, (30, 30))
+
+    def move(self):
+        """
+        Moving the bomb
+        """
+        self.bomb_x += self.speed_x
+        self.bomb_y -= self.speed_y
+
+        # Taking into account the reflection from the walls and slowing down the bomb
+        if self.bomb_x <= self.bomb_r:
+            self.bomb_x = self.bomb_r
+            self.speed_x = - self.speed_x * 0.8
+        if self.bomb_y <= 0:
+            self.bomb_y = 0
+            self.bomb_y = - self.speed_y
+            self.speed_x = self.speed_x * 0.8
+        if self.bomb_x >= screen_size_x - self.bomb_r:
+            self.bomb_x = screen_size_x - self.bomb_r
+            self.speed_x = - self.speed_x * 0.8
+        if self.bomb_y >= screen_size_y - self.bomb_r:
+            self.bomb_y = screen_size_y - self.bomb_r
+            self.speed_y = - self.speed_y * 0.9
+            self.speed_x = self.speed_x * 0.9
+
+        self.live -= 1
+        if self.live <= 0:
+            self.parent.delete_bomb()
+
+        screen.blit(self.scale, (self.bomb_x - 15, self.bomb_y - 15))
+
+    def check(self, gun_x, gun_y):
+        """
+        Checking whether the bomb hit the gun
+        """
+        if ((self.bomb_x - 15) <= (gun_x + 10)) and ((self.bomb_x + 15) >= (gun_x - 10)) and \
+                ((self.bomb_y - 15) <= (gun_y + 10)) and ((self.bomb_y + 15) >= (gun_y - 10)):
+            return True
+        else:
+            return False
+
+
 class Solyanka:
     def __init__(self):
         self.gun = Gun(self)
         self.balls = []
         self.targets_1 = []
         self.targets_2 = []
+        self.bombs = []
+        self.attack_time = 200
         for i in range(3):
             self.targets_1.append(Target_1(self))
             self.targets_1[i].new_target()
@@ -320,6 +431,9 @@ class Solyanka:
         self.screen_id_points = screen.blit(self.text, self.text.get_rect())
 
     def draw(self):
+        """
+        Draw everything
+        """
         self.gun.draw()
         for ball in self.balls:
             ball.move()
@@ -327,21 +441,58 @@ class Solyanka:
             target.move_target()
         for target in self.targets_2:
             target.move_target()
+        for bomb in self.bombs:
+            bomb.move()
         self.text = font.render(str(self.points), True, BLACK)
         self.screen_id_points = screen.blit(self.text, self.text.get_rect())
 
     def shoot(self, angle, power, start_x, start_y, button):
+        """
+        Shot out of a gun and the creation of bullets
+        baal_x - Starting position of the ball horizontally
+        ball_y - Starting position of the ball vertically
+        angle - Angle of rotation of the gun
+        power - The force of the flight of the ball
+        button - The type of the bullet
+        """
         if button == 1:
             self.balls.append(Common_ball(angle, power, start_x, start_y, self))
         if button == 3:
             self.balls.append(Bomb_ball(angle, power, start_x, start_y, self))
         self.count_of_shoots += 1
 
+    def attack(self):
+        """
+        Targets attack the gun
+        """
+        self.attack_time -= 1
+        if self.attack_time <= 0:
+            for target in self.targets_1:
+                self.bombs.append(Bomb(target.target_x, target.target_y, self.gun.gun_x, self.gun.gun_y, self))
+            self.attack_time = 200
+
+    def attack_check(self):
+        f = False
+        for bomb in self.bombs:
+            if bomb.check(self.gun.gun_x, self.gun.gun_y):
+                f = True
+        return f
+
+
     def delete_ball(self, color):
+        """
+        Removed a dead ball at the end of its life time
+        """
         for i in range(len(self.balls)):
             if self.balls[i].color == color:
                 del self.balls[i]
                 break
+
+    def delete_bomb(self):
+        """
+        Removed a dead bomb at the end of its life time
+        """
+        del self.bombs[0]
 
     def hitting_actions(self, target, points):
         for ball in self.balls:
@@ -362,6 +513,9 @@ class Solyanka:
                 self.hitting_actions(target, 5)
 
     def all_hitted(self):
+        """
+        If all targets are hit, complete the round
+        """
         if self.targets_1[0].hitted and self.targets_1[1].hitted and self.targets_1[2].hitted and \
                 self.targets_2[0].hitted and self.targets_2[1].hitted and self.targets_2[2].hitted:
             self.congrats_time -= 1
@@ -381,8 +535,47 @@ class Solyanka:
                 screen.blit(text, (screen_size_x // 4, screen_size_y // 2))
 
 
+def keydown_actions():
+    """
+    The movement of the gun
+    """
+    if event.key == pygame.K_d:
+        solyanka.gun.move_start('right')
+    if event.key == pygame.K_a:
+        solyanka.gun.move_start('left')
+    if event.key == pygame.K_w:
+        solyanka.gun.move_start('up')
+    if event.key == pygame.K_s:
+        solyanka.gun.move_start('down')
+
+
+def keyup_actions():
+    """
+    The end of the movement of the gun
+    """
+    if (event.key == pygame.K_d) and (solyanka.gun.direction == 'right'):
+        solyanka.gun.move_end()
+    if (event.key == pygame.K_a) and (solyanka.gun.direction == 'left'):
+        solyanka.gun.move_end()
+    if (event.key == pygame.K_w) and (solyanka.gun.direction == 'up'):
+        solyanka.gun.move_end()
+    if (event.key == pygame.K_s) and (solyanka.gun.direction == 'down'):
+        solyanka.gun.move_end()
+
+
+def button(font, text, x, y, color):
+    """
+    The function adds a field with text
+    """
+    textrun = font.render(text, True, RED, color)
+    textRect = textrun.get_rect()
+    textRect.center = (x, y)
+    screen.blit(textrun, textRect)
+
+
 clock = pygame.time.Clock()
 finished = False
+finished_game = False
 solyanka = Solyanka()
 
 while not finished:
@@ -392,18 +585,34 @@ while not finished:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             finished = True
+            finished_game = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
             solyanka.gun.fire_start()
         elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:
-                solyanka.gun.fire_end(1)
-            if event.button == 3:
-                solyanka.gun.fire_end(3)
+            solyanka.gun.fire_end(event.button)
+        elif event.type == pygame.KEYDOWN:
+            keydown_actions()
+        elif event.type == pygame.KEYUP:
+            keyup_actions()
         elif event.type == pygame.MOUSEMOTION:
             solyanka.gun.targetting(event)
+    solyanka.gun.move()
     solyanka.gun.power_up()
     solyanka.hitting()
     solyanka.draw()
     solyanka.all_hitted()
+    solyanka.attack()
+    finished = solyanka.attack_check()
+
+if not finished_game:
+    finished = False
+    while not finished:
+        clock.tick(FPS)
+        pygame.display.update()
+        screen.fill(BLACK)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                finished = True
+        button(font, 'GAME OVER', screen_size_x // 2, screen_size_y // 2, BLACK)
 
 pygame.quit()
