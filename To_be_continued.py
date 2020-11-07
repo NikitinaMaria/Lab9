@@ -19,6 +19,7 @@ MAGENTA = (255, 0, 255)
 CYAN = (0, 255, 255)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+LIL = (190, 0, 255)
 
 # The main screen
 screen = pygame.display.set_mode((screen_size_x, screen_size_y))
@@ -28,8 +29,37 @@ screen.fill(WHITE)
 font = pygame.font.Font('freesansbold.ttf', 32)
 
 
+class Targets:
+    def __init__(self, color):
+        self.target_x = 10
+        self.target_y = 10
+        self.target_r = 10
+        self.target_speed_x = 10
+        self.target_speed_y = 10
+        self.color = color
+        self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
+        self.hitted = False
+
+    def new_target(self):
+        """
+        Initializing a new goal
+        """
+        self.target_x = rnd(600, 780)
+        self.target_y = rnd(300, 550)
+        self.target_r = rnd(10, 50)
+        self.target_speed_x = rnd(-5, 5)
+        self.target_speed_y = rnd(-5, 5)
+        self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
+
+    def hit(self):
+        """
+        The ball hits the target
+        """
+        self.hitted = True
+
+
 class Ball:
-    def __init__(self, angle, power, parent, ball_x=40, ball_y=450):
+    def __init__(self, angle, power, start_x, start_y, gravitation, parent):
         """ Constructor of the ball class
 
         Args:
@@ -39,8 +69,9 @@ class Ball:
         power - The force of the flight of the ball
         """
         self.parent = parent
-        self.ball_x = ball_x
-        self.ball_y = ball_y
+        self.ball_x = start_x
+        self.ball_y = start_y
+        self.gravitation = gravitation
 
         # Radius of the ball
         self.ball_r = 13
@@ -48,7 +79,10 @@ class Ball:
         # Speed of the ball
         self.speed_x = 0.8 * power * math.cos(angle)
         self.speed_y = - 0.8 * power * math.sin(angle)
-        self.color = choice([RED, GREEN, BLUE, MAGENTA])
+        if self.gravitation == 1:
+            self.color = BLUE
+        if self.gravitation == -1:
+            self.color = MAGENTA
         self.id = circle(screen, self.color,
                          (self.ball_x, self.ball_y,), self.ball_r)
         self.live = 200
@@ -57,8 +91,7 @@ class Ball:
         """
         Moving the ball
         """
-        gravitation = 1
-        self.speed_y -= gravitation
+        self.speed_y -= self.gravitation
         self.ball_x += self.speed_x
         self.ball_y -= self.speed_y
 
@@ -97,7 +130,7 @@ class Ball:
 
 
 class Gun:
-    def __init__(self, parent, gun_power=10, gun_on=0, gun_angle=0):
+    def __init__(self, parent, gun_power=10, gun_on=0, gun_angle=0, gun_x=100, gun_y=450):
         """ Constructor of the gun class
         Args:
         gun_power - Power of the gun
@@ -109,7 +142,9 @@ class Gun:
         self.gun_on = gun_on
         self.gun_angle = gun_angle
         self.color = BLACK
-        self.id = line(screen, self.color, [20, 420], [50, 450], 7)
+        self.gun_x = gun_x
+        self.gun_y = gun_y
+        self.id = line(screen, self.color, [self.gun_x, self.gun_y], [self.gun_x + 20, self.gun_y + 20], 7)
 
     def fire_start(self):
         """
@@ -117,12 +152,12 @@ class Gun:
         """
         self.gun_on = 1
 
-    def fire_end(self):
+    def fire_end(self, gravitation):
         """
         Turning off the gun
         """
         self.gun_on = 0
-        self.parent.shoot(self.gun_angle, self.gun_power)
+        self.parent.shoot(self.gun_angle, self.gun_power, self.gun_x, self.gun_y, gravitation)
         self.gun_power = 10
 
     def targetting(self, event):
@@ -130,8 +165,11 @@ class Gun:
         Aiming. Depends on the mouse position
         """
         mouse_x, mouse_y = event.pos
-        if mouse_x > 20:
-            self.gun_angle = math.atan((mouse_y - 450) / (mouse_x - 20))
+        if mouse_x != self.gun_x:
+            if mouse_x > self.gun_x:
+                self.gun_angle = math.atan((mouse_y - self.gun_y) / (mouse_x - self.gun_x))
+            else:
+                self.gun_angle = math.pi + math.atan((mouse_y - self.gun_y) / (mouse_x - self.gun_x))
 
     def draw(self):
         """
@@ -141,9 +179,9 @@ class Gun:
             self.color = RED
         else:
             self.color = BLACK
-        self.id = line(screen, self.color, [20, 450],
-                       [20 + max(self.gun_power, 20) * math.cos(self.gun_angle),
-                        450 + max(self.gun_power, 20) * math.sin(self.gun_angle)], 7)
+        self.id = line(screen, self.color, [self.gun_x, self.gun_y],
+                       [self.gun_x + max(self.gun_power, 20) * math.cos(self.gun_angle),
+                        self.gun_y + max(self.gun_power, 20) * math.sin(self.gun_angle)], 7)
 
     def power_up(self):
         """
@@ -157,39 +195,17 @@ class Gun:
             self.color = BLACK
 
 
-class Target:
+class Target_1(Targets):
     def __init__(self, parent):
         """
         Constructor of the target class
         """
-        self.points = 0
-        self.live = 1
-        self.color = RED
-        self.target_x = 0
-        self.target_y = 0
-        self.target_r = 0
-        self.target_speed_x = 0
-        self.target_speed_y = 0
-        self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
-        self.text = font.render(str(self.points), True, BLACK)
-        self.screen_id_points = screen.blit(self.text, self.text.get_rect())
+        super().__init__(RED)
         self.parent = parent
-        self.hitted = False
-
-    def new_target(self):
-        """
-        Initializing a new goal
-        """
-        self.target_x = rnd(600, 780)
-        self.target_y = rnd(300, 550)
-        self.target_r = rnd(10, 50)
-        self.target_speed_x = rnd(-5, 5)
-        self.target_speed_y = rnd(-5, 5)
-        self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
 
     def move_target(self):
         """
-        Drawing a target
+        Moving a target
         """
         if not self.hitted:
             self.target_x += self.target_speed_x
@@ -209,22 +225,70 @@ class Target:
                 self.target_y = screen_size_y - self.target_r
                 self.target_speed_y = - self.target_speed_y
             self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
+            circle(screen, BLACK, (self.target_x, self.target_y), self.target_r, 1)
 
-    def hit(self, points=1):
+class Target_2(Targets):
+    def __init__(self, parent):
         """
-        The ball hits the target
+        Constructor of the target class
         """
-        self.hitted = True
+        super().__init__(LIL)
+        self.parent = parent
+        self.target_r //= 2
+        self.show_time = 60
+        self.hide_time = 50
+        self.invisible = False
+
+    def move_target(self):
+        """
+        Moving a target
+        """
+        if not self.hitted:
+            if self.show_time > 0:
+                if self.show_time % 3 == 0:
+                    self.target_r += 1
+                self.show_time -= 1
+                self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
+                circle(screen, BLACK, (self.target_x, self.target_y), self.target_r, 1)
+            else:
+                self.invisible = True
+                if self.hide_time > 0:
+                    self.hide_time -= 1
+                    self.target_x += self.target_speed_x * 5
+                    self.target_y -= self.target_speed_y * 5
+
+                    # Taking into account the reflection from the walls and slowing down the ball
+                    if self.target_x <= self.target_r:
+                        self.target_x = self.target_r
+                        self.target_speed_x = - self.target_speed_x
+                    if self.target_y <= self.target_r:
+                        self.target_y = self.target_r
+                        self.target_speed_y = - self.target_speed_y
+                    if self.target_x >= screen_size_x - self.target_r:
+                        self.target_x = screen_size_x - self.target_r
+                        self.target_speed_x = - self.target_speed_x
+                    if self.target_y >= screen_size_y - self.target_r:
+                        self.target_y = screen_size_y - self.target_r
+                        self.target_speed_y = - self.target_speed_y
+                else:
+                    self.invisible = False
+                    self.show_time = 60
+                    self.target_r -= 20
+                    self.hide_time = 50
 
 
 class Solyanka:
     def __init__(self):
         self.gun = Gun(self)
         self.balls = []
-        self.targets = []
+        self.targets_1 = []
+        self.targets_2 = []
         for i in range(3):
-            self.targets.append(Target(self))
-            self.targets[i].new_target()
+            self.targets_1.append(Target_1(self))
+            self.targets_1[i].new_target()
+        for i in range(3):
+            self.targets_2.append(Target_2(self))
+            self.targets_2[i].new_target()
         self.points = 0
         self.count_of_shoots = 0
         self.congrats_time = 100
@@ -235,32 +299,46 @@ class Solyanka:
         self.gun.draw()
         for ball in self.balls:
             ball.move()
-        for target in self.targets:
+        for target in self.targets_1:
+            target.move_target()
+        for target in self.targets_2:
             target.move_target()
         self.text = font.render(str(self.points), True, BLACK)
         self.screen_id_points = screen.blit(self.text, self.text.get_rect())
 
-    def shoot(self, angle, power):
-        self.balls.append(Ball(angle, power, self))
+    def shoot(self, angle, power, start_x, start_y, gravitation):
+        self.balls.append(Ball(angle, power, start_x, start_y, gravitation, self))
         self.count_of_shoots += 1
 
     def delete_ball(self):
         del self.balls[0]
 
     def hitting(self):
-        for target in self.targets:
+        for target in self.targets_1:
             if not target.hitted:
                 for ball in self.balls:
                     if ball.check(target.target_x, target.target_y, target.target_r):
                         target.hit()
                         self.points += 1
+        for target in self.targets_2:
+            if not target.hitted and not target.invisible:
+                for ball in self.balls:
+                    if ball.check(target.target_x, target.target_y, target.target_r):
+                        target.hit()
+                        self.points += 5
 
     def all_hitted(self):
-        if self.targets[0].hitted and self.targets[1].hitted and self.targets[2].hitted:
+        if self.targets_1[0].hitted and self.targets_1[1].hitted and self.targets_1[2].hitted and \
+                self.targets_2[0].hitted and self.targets_2[1].hitted and self.targets_2[2].hitted:
             self.congrats_time -= 1
             if self.congrats_time < 0:
-                for target in self.targets:
+                for target in self.targets_1:
                     target.new_target()
+                    target.hitted = False
+                for target in self.targets_2:
+                    target.new_target()
+                    target.show_time = 60
+                    target.hide_time = 50
                     target.hitted = False
                 self.congrats_time = 100
                 self.count_of_shoots = 0
@@ -283,7 +361,10 @@ while not finished:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             solyanka.gun.fire_start()
         elif event.type == pygame.MOUSEBUTTONUP:
-            solyanka.gun.fire_end()
+            if event.button == 1:
+                solyanka.gun.fire_end(1)
+            if event.button == 3:
+                solyanka.gun.fire_end(-1)
         elif event.type == pygame.MOUSEMOTION:
             solyanka.gun.targetting(event)
     solyanka.gun.power_up()
