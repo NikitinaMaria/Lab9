@@ -58,8 +58,8 @@ class Targets:
         self.hitted = True
 
 
-class Ball:
-    def __init__(self, angle, power, start_x, start_y, gravitation, parent):
+class Balls:
+    def __init__(self, angle, power, start_x, start_y, color, parent):
         """ Constructor of the ball class
 
         Args:
@@ -71,7 +71,7 @@ class Ball:
         self.parent = parent
         self.ball_x = start_x
         self.ball_y = start_y
-        self.gravitation = gravitation
+        self.color = color
 
         # Radius of the ball
         self.ball_r = 13
@@ -79,10 +79,7 @@ class Ball:
         # Speed of the ball
         self.speed_x = 0.8 * power * math.cos(angle)
         self.speed_y = - 0.8 * power * math.sin(angle)
-        if self.gravitation == 1:
-            self.color = BLUE
-        if self.gravitation == -1:
-            self.color = MAGENTA
+
         self.id = circle(screen, self.color,
                          (self.ball_x, self.ball_y,), self.ball_r)
         self.live = 200
@@ -91,7 +88,6 @@ class Ball:
         """
         Moving the ball
         """
-        self.speed_y -= self.gravitation
         self.ball_x += self.speed_x
         self.ball_y -= self.speed_y
 
@@ -112,8 +108,8 @@ class Ball:
             self.speed_x = self.speed_x * 0.9
 
         self.live -= 1
-        if self.live == 0:
-            self.parent.delete_ball()
+        if self.live <= 0:
+            self.parent.delete_ball(self.color)
         self.id = circle(screen,
                          self.color,
                          (round(self.ball_x), round(self.ball_y)), self.ball_r)
@@ -127,6 +123,34 @@ class Ball:
         if distance <= self.ball_r + target_r:
             return True
         return False
+
+
+class Common_ball(Balls):
+    def __init__(self, angle, power, start_x, start_y, parent):
+        """
+        Constructor of the Common_ball class
+        """
+        super().__init__(angle, power, start_x, start_y, BLUE, parent)
+
+
+class Bomb_ball(Balls):
+    def __init__(self, angle, power, start_x, start_y, parent):
+        """
+        Constructor of the Bomb_ball class
+        """
+        super().__init__(angle, power, start_x, start_y, MAGENTA, parent)
+        self.ball_r = 10
+        self.speed_x *= 0.5
+        self.speed_y *= 0.5
+
+class Mini_ball(Balls):
+    def __init__(self, angle, power, start_x, start_y, parent):
+        """
+        Constructor of the Mini_ball class
+        """
+        super().__init__(angle, power, start_x, start_y, GREEN, parent)
+        self.ball_r = 5
+        self.live = 50
 
 
 class Gun:
@@ -152,12 +176,12 @@ class Gun:
         """
         self.gun_on = 1
 
-    def fire_end(self, gravitation):
+    def fire_end(self, button):
         """
         Turning off the gun
         """
         self.gun_on = 0
-        self.parent.shoot(self.gun_angle, self.gun_power, self.gun_x, self.gun_y, gravitation)
+        self.parent.shoot(self.gun_angle, self.gun_power, self.gun_x, self.gun_y, button)
         self.gun_power = 10
 
     def targetting(self, event):
@@ -306,26 +330,36 @@ class Solyanka:
         self.text = font.render(str(self.points), True, BLACK)
         self.screen_id_points = screen.blit(self.text, self.text.get_rect())
 
-    def shoot(self, angle, power, start_x, start_y, gravitation):
-        self.balls.append(Ball(angle, power, start_x, start_y, gravitation, self))
+    def shoot(self, angle, power, start_x, start_y, button):
+        if button == 1:
+            self.balls.append(Common_ball(angle, power, start_x, start_y, self))
+        if button == 3:
+            self.balls.append(Bomb_ball(angle, power, start_x, start_y, self))
         self.count_of_shoots += 1
 
-    def delete_ball(self):
-        del self.balls[0]
+    def delete_ball(self, color):
+        for i in range(len(self.balls)):
+            if self.balls[i].color == color:
+                del self.balls[i]
+                break
+
+    def hitting_actions(self, target, points):
+        for ball in self.balls:
+            if ball.check(target.target_x, target.target_y, target.target_r):
+                if isinstance(ball, Bomb_ball):
+                    for i in range(6):
+                        self.balls.append(Mini_ball(i, 2, int(ball.ball_x), int(ball.ball_y), self))
+                self.balls.remove(ball)
+                target.hit()
+                self.points += points
 
     def hitting(self):
         for target in self.targets_1:
             if not target.hitted:
-                for ball in self.balls:
-                    if ball.check(target.target_x, target.target_y, target.target_r):
-                        target.hit()
-                        self.points += 1
+                self.hitting_actions(target, 1)
         for target in self.targets_2:
             if not target.hitted and not target.invisible:
-                for ball in self.balls:
-                    if ball.check(target.target_x, target.target_y, target.target_r):
-                        target.hit()
-                        self.points += 5
+                self.hitting_actions(target, 5)
 
     def all_hitted(self):
         if self.targets_1[0].hitted and self.targets_1[1].hitted and self.targets_1[2].hitted and \
@@ -364,7 +398,7 @@ while not finished:
             if event.button == 1:
                 solyanka.gun.fire_end(1)
             if event.button == 3:
-                solyanka.gun.fire_end(-1)
+                solyanka.gun.fire_end(3)
         elif event.type == pygame.MOUSEMOTION:
             solyanka.gun.targetting(event)
     solyanka.gun.power_up()
