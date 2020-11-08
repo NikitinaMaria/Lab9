@@ -276,6 +276,7 @@ class Target_1(Targets):
         """
         super().__init__(RED)
         self.parent = parent
+        self.target_surf = pygame.image.load('angry.png')
 
     def move_target(self):
         """
@@ -298,8 +299,8 @@ class Target_1(Targets):
             if self.target_y >= screen_size_y - self.target_r:
                 self.target_y = screen_size_y - self.target_r
                 self.target_speed_y = - self.target_speed_y
-            self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
-            circle(screen, BLACK, (self.target_x, self.target_y), self.target_r, 1)
+            self.scale = pygame.transform.scale(self.target_surf, (2 * self.target_r, 2 * self.target_r))
+            screen.blit(self.scale, (self.target_x - self.target_r, self.target_y - self.target_r))
 
 
 class Target_2(Targets):
@@ -313,6 +314,7 @@ class Target_2(Targets):
         self.show_time = 60
         self.hide_time = 50
         self.invisible = False
+        self.target_surf = pygame.image.load('bomb.png')
 
     def move_target(self):
         """
@@ -323,8 +325,8 @@ class Target_2(Targets):
                 if self.show_time % 3 == 0:
                     self.target_r += 1
                 self.show_time -= 1
-                self.id = circle(screen, self.color, (self.target_x, self.target_y), self.target_r)
-                circle(screen, BLACK, (self.target_x, self.target_y), self.target_r, 1)
+                self.scale = pygame.transform.scale(self.target_surf, (2 * self.target_r, 2 * self.target_r))
+                screen.blit(self.scale, (self.target_x - self.target_r, self.target_y - self.target_r))
             else:
                 self.invisible = True
                 if self.hide_time > 0:
@@ -403,11 +405,22 @@ class Bomb:
         """
         Checking whether the bomb hit the gun
         """
-        if ((self.bomb_x - 15) <= (gun_x + 10)) and ((self.bomb_x + 15) >= (gun_x - 10)) and \
-                ((self.bomb_y - 15) <= (gun_y + 10)) and ((self.bomb_y + 15) >= (gun_y - 10)):
+        if ((self.bomb_x - 15) <= (gun_x + 15)) and ((self.bomb_x + 15) >= (gun_x - 15)) and \
+                ((self.bomb_y - 15) <= (gun_y + 15)) and ((self.bomb_y + 15) >= (gun_y - 15)):
             return True
         else:
             return False
+
+
+class Hp:
+    def __init__(self, place, parent):
+        self.parent = parent
+        self.place = place * 50
+        self.hp_surf = pygame.image.load('heart.png')
+        self.scale = pygame.transform.scale(self.hp_surf, (50, 50))
+
+    def draw(self):
+        screen.blit(self.scale, (650 + self.place, 0))
 
 
 class Solyanka:
@@ -417,6 +430,7 @@ class Solyanka:
         self.targets_1 = []
         self.targets_2 = []
         self.bombs = []
+        self.hp = []
         self.attack_time = 200
         for i in range(3):
             self.targets_1.append(Target_1(self))
@@ -424,7 +438,10 @@ class Solyanka:
         for i in range(3):
             self.targets_2.append(Target_2(self))
             self.targets_2[i].new_target()
+        for i in range(3):
+            self.hp.append(Hp(i, self))
         self.points = 0
+        self.hit_points = 3
         self.count_of_shoots = 0
         self.congrats_time = 100
         self.text = font.render(str(self.points), True, BLACK)
@@ -443,6 +460,8 @@ class Solyanka:
             target.move_target()
         for bomb in self.bombs:
             bomb.move()
+        for heart in self.hp:
+            heart.draw()
         self.text = font.render(str(self.points), True, BLACK)
         self.screen_id_points = screen.blit(self.text, self.text.get_rect())
 
@@ -468,14 +487,20 @@ class Solyanka:
         self.attack_time -= 1
         if self.attack_time <= 0:
             for target in self.targets_1:
-                self.bombs.append(Bomb(target.target_x, target.target_y, self.gun.gun_x, self.gun.gun_y, self))
+                if not target.hitted:
+                    self.bombs.append(Bomb(target.target_x, target.target_y, self.gun.gun_x, self.gun.gun_y, self))
             self.attack_time = 200
 
     def attack_check(self):
         f = False
         for bomb in self.bombs:
             if bomb.check(self.gun.gun_x, self.gun.gun_y):
-                f = True
+                self.hit_points -= 1
+                self.bombs.remove(bomb)
+                if self.hit_points >= 0:
+                    del self.hp[0]
+        if self.hit_points <= 0:
+            f = True
         return f
 
 
@@ -578,7 +603,7 @@ finished = False
 finished_game = False
 solyanka = Solyanka()
 
-while not finished:
+while (not finished) and (not finished_game):
     clock.tick(FPS)
     pygame.display.update()
     screen.fill(WHITE)
